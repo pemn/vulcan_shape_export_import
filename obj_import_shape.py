@@ -7,7 +7,7 @@
 # output_dgd: path to a new or existing dgd where the data will be saved
 # v1.0 05/2019 paulo.ernesto
 '''
-usage: $0 input_shp*shp layer:input_shp name:input_shp group:input_shp feature:input_shp output_dgd*dgd.isis
+usage: $0 input_shp*shp layer:input_shp name:input_shp group:input_shp feature:input_shp value:input_shp output_dgd*dgd.isis
 '''
 
 '''
@@ -40,16 +40,13 @@ sys.path.append(os.path.splitext(sys.argv[0])[0] + '.pyz')
 
 from _gui import usage_gui
 
-def obj_import_shape(input_shp, object_layer, object_name, object_group, object_feature, output_dgd):
+def obj_import_shape(input_shp, object_layer, object_name, object_group, object_feature, object_value, output_dgd):
+  print("# obj_import_shape")
+  import vulcan
   import shapefile
-  print("obj_import_shape")
 
   shapes = shapefile.Reader(input_shp)
   
-  # fields = dict([(shapes.fields[i][0], i-1) for i in range(1, len(shapes.fields))])
-
-  import vulcan
-
   dgd = None
   if os.path.exists(output_dgd):
     dgd = vulcan.dgd(output_dgd, 'w')
@@ -61,10 +58,6 @@ def obj_import_shape(input_shp, object_layer, object_name, object_group, object_
   for item in shapes.shapeRecords():
     point_type = int(not re.search('POINT', item.shape.shapeTypeName))
 
-    coordinates = [tuple(_) + (0,0,point_type) for _ in item.shape.points]
-
-    obj = vulcan.polyline(coordinates)
-
     # object without a valid layer name will have this default layer
     layer_name = '0'
     fields = item.record.as_dict()
@@ -74,20 +67,36 @@ def obj_import_shape(input_shp, object_layer, object_name, object_group, object_
     elif object_layer:
       layer_name = object_layer
 
-    if object_name in fields:
-      obj.set_name(str(fields[object_name]))
-    if object_group in fields:
-      obj.set_group(str(fields[object_group]))
-    if object_feature in fields:
-      obj.set_group(str(fields[object_feature]))
+    p1 = len(item.shape.points)
+    # each object may have multiple parts
+    # create a object for each of these parts
+    for p in reversed(item.shape.parts):
+      coordinates = [tuple(_) + (0,0,point_type) for _ in item.shape.points[p:p1]]
+      # print("p", p, "p1", p1)
+      p1 = p
+      # continue
 
-    if layer_name not in layers:
-      layers[layer_name] = vulcan.layer(layer_name)
+      obj = vulcan.polyline(coordinates)
 
-    layers[layer_name].append(obj)
+
+      if object_name in fields:
+        obj.set_name(str(fields[object_name]))
+      if object_group in fields:
+        obj.set_group(str(fields[object_group]))
+      if object_feature in fields:
+        obj.set_feature(str(fields[object_feature]))
+      if object_value in fields:
+        obj.set_value(fields[object_value])
+
+      if layer_name not in layers:
+        layers[layer_name] = vulcan.layer(layer_name)
+
+      layers[layer_name].append(obj)
 
   for layer_obj in layers.values():
     dgd.save_layer(layer_obj)
+
+  print("finished")
 
 main = obj_import_shape
 

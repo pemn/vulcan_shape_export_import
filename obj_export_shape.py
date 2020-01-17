@@ -5,9 +5,8 @@
 # output_shp: path to the shape file (the auxiliary files must also exist)
 # v1.0 05/2019 paulo.ernesto
 '''
-usage: $0 input_dgd*dgd.isis input_layers#layer:input_dgd output_shp*shp
+usage: $0 input_dgd*dgd.isis input_layers#layer!input_dgd output_shp*shp
 '''
-
 '''
 Copyright 2019 Vale
 
@@ -37,6 +36,9 @@ sys.path.append(os.path.splitext(sys.argv[0])[0] + '.pyz')
 
 from _gui import usage_gui
 
+def encode_string(string, encoding='utf-8', encodingErrors='replace'):
+  return string.encode(encoding, encodingErrors)
+
 def obj_export_shape(input_dgd, input_layers, output_shp):
   print("obj_export_shape")
   import shapefile
@@ -48,6 +50,7 @@ def obj_export_shape(input_dgd, input_layers, output_shp):
   shpw.field('group', 'C')
   shpw.field('feature', 'C')
   shpw.field('description', 'C')
+  shpw.field('value', 'N')
   shpw.field('colour', 'N')
 
   dgd = vulcan.dgd(input_dgd, 'w')
@@ -58,15 +61,13 @@ def obj_export_shape(input_dgd, input_layers, output_shp):
     layer = dgd.get_layer(layer_name)
     for obj in layer:
       print(layer_name, obj.get_name())
-      # if obj.num_points() == 1:
-      #   p = obj.get_point(0)
-      #   shpw.pointz(p.get_x(), p.get_y(), p.get_z())
-      #   # shpw.null()
-      # elif obj.num_points() == 2:
-      #   # shpw.linez([])
-      #   shpw.null()
-      shpw.polyz([obj.coordinates])
-      shpw.record(layer_name, obj.get_name(), obj.get_group(), obj.get_feature(), obj.get_description(), obj.get_colour())
+      if hasattr(obj, "coordinates"):
+        shpw.polyz([obj.coordinates])
+        name = encode_string(obj.get_name())
+        group = encode_string(obj.get_group())
+        feature = encode_string(obj.get_feature())
+        description = encode_string(obj.get_description())
+        shpw.record(layer_name, name, group, feature, description, obj.get_value(), obj.get_colour())
   
   shpw.close()
 
